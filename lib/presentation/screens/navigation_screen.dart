@@ -1,4 +1,5 @@
-import 'package:cineswap/core/app_exports.dart';
+import 'package:cineswipe/core/app_exports.dart';
+import 'package:cupertino_native/cupertino_native.dart';
 
 class NavigationScreen extends StatefulWidget {
   final Size size;
@@ -10,160 +11,134 @@ class NavigationScreen extends StatefulWidget {
 
 class _NavigationScreenState extends State<NavigationScreen> {
   int _selectedIndex = 1;
-  Color _previousAccentColor = AppColors.white;
+  late final List<Widget> _pages;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    final currentColor = context.watch<MoviesProvider>().accentColor;
-
-    if (currentColor != _previousAccentColor) {
-      setState(() {
-        _previousAccentColor = currentColor;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentAccentColor =
-        context.watch<MoviesProvider>().accentColor;
-    final provider = Provider.of<MoviesProvider>(context);
-
-    final List<Widget> pages = [
+  void initState() {
+    super.initState();
+    // Pages are created once — same instances are always passed to IndexedStack,
+    // preventing CachedNetworkImage from re-triggering shimmer on provider rebuilds.
+    _pages = [
       FiltersScreen(
         size: widget.size,
         onFiltersApplied: () {
-          setState(() {
-            _selectedIndex = 1;
-          });
+          setState(() => _selectedIndex = 1);
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            provider.loadFilteredMovies(count: 25, isInitial: true);
+            Provider.of<MoviesProvider>(context, listen: false)
+                .loadFilteredMovies(count: 25, isInitial: true);
           });
         },
         onFiltersReset: () {
-          setState(() {
-            _selectedIndex = 1;
-          });
-           WidgetsBinding.instance.addPostFrameCallback((_) {
-            provider.resetFilters();
+          setState(() => _selectedIndex = 1);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Provider.of<MoviesProvider>(context, listen: false).resetFilters();
           });
         },
       ),
       HomeScreen(size: widget.size),
       FavoritesScreen(size: widget.size),
     ];
+  }
+
+  void _onTabTap(int index) {
+    if (_selectedIndex != index) {
+      HapticService.light();
+      setState(() => _selectedIndex = index);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentAccentColor = context.watch<MoviesProvider>().accentColor;
+
     final Size size = widget.size;
 
     return Scaffold(
       backgroundColor: AppColors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            TweenAnimationBuilder<Color?>(
-              tween: ColorTween(
-                begin: _previousAccentColor,
-                end: currentAccentColor,
-              ),
-              duration: const Duration(milliseconds: 700),
-              onEnd: () {
-                _previousAccentColor = currentAccentColor;
-              },
-              builder: (context, animatedColor, child) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.black, animatedColor!],
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      stops: [0.0, 0.6],
-                    ),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical:
-                          _selectedIndex == 2
-                              ? 0
-                              : size.height * 0.02,
-                      horizontal: size.width * 0.06,
-                    ),
-                    child: IndexedStack(
-                      index: _selectedIndex,
-                      children: pages,
-                    ),
-                  ),
-                );
-              },
-            ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                margin: EdgeInsets.only(
-                  bottom: size.height * 0.02,
+      body: Stack(
+        children: [
+          // Animated liquid background — full screen
+          Positioned.fill(
+            child: LiquidBackground(accentColor: currentAccentColor),
+          ),
+
+          // Page content with safe area, padded below to clear the tab bar
+          Positioned.fill(
+            child: SafeArea(
+              top: _selectedIndex != 2,
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: (_selectedIndex == 2 || _selectedIndex == 0) ? 0 : size.height * 0.02,
                   left: size.width * 0.06,
                   right: size.width * 0.06,
+                  bottom: 0,
                 ),
-                padding: EdgeInsets.symmetric(
-                  vertical: size.height * 0.01,
-                  horizontal: size.width * 0.1,
+                child: IndexedStack(
+                  index: _selectedIndex,
+                  children: _pages,
                 ),
-                decoration: BoxDecoration(
-                  color: AppColors.black.withAlpha(240),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.white.withAlpha(127),
-                      blurRadius: 10,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    NavBarItem(
-                      size: size,
-                      isSelected: _selectedIndex == 0,
-                      icon: Icons.filter_list_rounded,
-                      text: 'Filter',
-                      onTap: () {
-                        setState(() {
-                          _selectedIndex = 0;
-                        });
-                      },
-                    ),
-                    NavBarItem(
-                      size: size,
-                      isSelected: _selectedIndex == 1,
-                      icon: Icons.home_rounded,
-                      text: 'Home',
-                      onTap: () {
-                        setState(() {
-                          _selectedIndex = 1;
-                        });
-                      },
-                    ),
-                    NavBarItem(
-                      size: size,
-                      isSelected: _selectedIndex == 2,
-                      icon: Icons.favorite,
-                      text: 'Liked',
-                      onTap: () {
-                        setState(() {
-                          _selectedIndex = 2;
-                        });
-                      },
-                    ),
+              ),
+            ),
+          ),
+
+          // Bottom gradient overlay to block clicks and provide visual depth
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: size.height * 0.18,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.black.withValues(alpha: 0.0),
+                    AppColors.black.withValues(alpha: 0.8),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+
+          // Native iOS 26 liquid glass tab bar
+          Positioned(
+            bottom: size.height * 0.01,
+            left: size.width * 0.06,
+            right: size.width * 0.06,
+            child: CNTabBar(
+              backgroundColor: Colors.transparent,
+              tint: AppColors.white,
+              items: [
+                CNTabBarItem(
+                  label: 'Filter',
+                  icon: CNSymbol(
+                    _selectedIndex == 0
+                        ? 'line.3.horizontal.decrease.circle.fill'
+                        : 'line.3.horizontal.decrease.circle',
+                  ),
+                ),
+                CNTabBarItem(
+                  label: 'Home',
+                  icon: CNSymbol(
+                    _selectedIndex == 1 ? 'house.fill' : 'house',
+                  ),
+                ),
+                CNTabBarItem(
+                  label: 'Liked',
+                  icon: CNSymbol(
+                    _selectedIndex == 2 ? 'heart.fill' : 'heart',
+                  ),
+                ),
+              ],
+              currentIndex: _selectedIndex,
+              onTap: _onTabTap,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+

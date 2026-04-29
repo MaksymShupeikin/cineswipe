@@ -1,52 +1,49 @@
-import 'package:cineswap/core/app_exports.dart';
-import 'package:http/http.dart' as http;
-import 'dart:ui' as ui;
+import 'package:cineswipe/core/app_exports.dart';
+import 'package:palette_generator/palette_generator.dart';
+
+typedef ImageRegionColors = ({Color average, Color top, Color bottom});
 
 class ColorFromImageService {
+  /// Extracts dominant palette colors from a network image using k-means
+  /// clustering (palette_generator). The image is sampled at 150×225 for speed.
+  /// Uses the disk cache from cached_network_image so repeated calls are cheap.
+  static Future<ImageRegionColors> getImageRegionColors(
+    String imageUrl,
+  ) async {
+    const fallback = (
+      average: AppColors.white,
+      top: AppColors.white,
+      bottom: AppColors.white,
+    );
+
+    try {
+      final palette = await PaletteGenerator.fromImageProvider(
+        CachedNetworkImageProvider(imageUrl),
+        size: const Size(150, 225),
+        maximumColorCount: 16,
+      );
+
+      final vibrant  = palette.vibrantColor?.color;
+      final dominant = palette.dominantColor?.color;
+      final light    = palette.lightVibrantColor?.color;
+      final dark     = palette.darkVibrantColor?.color ?? palette.darkMutedColor?.color;
+
+      final base = vibrant ?? dominant ?? AppColors.white;
+
+      return (
+        average: base,
+        top:     light ?? base,
+        bottom:  dark  ?? base,
+      );
+    } catch (e) {
+      debugPrint('ColorFromImageService error: $e');
+      return fallback;
+    }
+  }
+
   static Future<Color> getAverageColorFromNetworkImage(
     String imageUrl,
   ) async {
-    try {
-      final response = await http.get(Uri.parse(imageUrl));
-      if (response.statusCode != 200) return Colors.black;
-
-      final Uint8List bytes = response.bodyBytes;
-      final ui.Codec codec = await ui.instantiateImageCodec(
-        bytes,
-        targetWidth: 10,
-        targetHeight: 10,
-      );
-      final ui.FrameInfo frame = await codec.getNextFrame();
-      final ui.Image image = frame.image;
-
-      final ByteData? byteData = await image.toByteData(
-        format: ui.ImageByteFormat.rawRgba,
-      );
-      if (byteData == null) return Colors.black;
-
-      final Uint8List pixels = byteData.buffer.asUint8List();
-
-      int redSum = 0;
-      int greenSum = 0;
-      int blueSum = 0;
-      int pixelCount = 0;
-
-      for (int i = 0; i < pixels.length; i += 80) {
-        redSum += pixels[i];
-        greenSum += pixels[i + 1];
-        blueSum += pixels[i + 2];
-        pixelCount++;
-      }
-
-      return Color.fromARGB(
-        255,
-        (redSum / pixelCount).round(),
-        (greenSum / pixelCount).round(),
-        (blueSum / pixelCount).round(),
-      );
-    } catch (e) {
-      debugPrint('Error getAverageColorFromNetworkImage: $e');
-      return AppColors.white;
-    }
+    return (await getImageRegionColors(imageUrl)).average;
   }
 }

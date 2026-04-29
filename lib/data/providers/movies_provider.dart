@@ -1,4 +1,5 @@
-import 'package:cineswap/core/app_exports.dart';
+import 'package:cineswipe/core/app_exports.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 class MoviesProvider with ChangeNotifier {
   final MovieService _movieService = MovieService();
@@ -6,66 +7,92 @@ class MoviesProvider with ChangeNotifier {
   List<Movie> _movies = [];
   final List<Movie> _favorites = [];
   final List<int> _selectedGenreIds = [];
+  final List<String> _selectedCountryCodes = [];
   final Set<int> _usedPages = {};
   final Random _random = Random();
-  double _minRating = 0.0;
+  double _minRating = 4.0;
   double _maxRating = 10.0;
-  int _minDecade = 1920;
-  int _maxDecade = 2020;
+  int _minYear = 1975;
+  int _maxYear = 2024;
   int _filteredPage = 0;
   bool _isFetching = false;
   bool _filtersApplied = false;
+  bool _isLoadingMore = false;
   Color _accentColor = AppColors.white;
 
   List<Movie> get movies => _movies;
   List<Movie> get favorites => _favorites;
   List<int> get selectedGenreIds => _selectedGenreIds;
+  List<String> get selectedCountryCodes => _selectedCountryCodes;
   bool get isFetching => _isFetching;
   bool get filtersApplied => _filtersApplied;
   Color get accentColor => _accentColor;
   double get minRating => _minRating;
   double get maxRating => _maxRating;
-  int get minDecade => _minDecade;
-  int get maxDecade => _maxDecade;
+  int get minYear => _minYear;
+  int get maxYear => _maxYear;
 
   Future<void> loadInitialMovies() async {
     _movies.clear();
     _usedPages.clear();
 
-    _isFetching = true;
-    notifyListeners();
+    // Show cached movies instantly — no shimmer on 2nd+ launch
+    final cached = StorageService.getCachedMovies();
+    if (cached.isNotEmpty) {
+      _movies.addAll(cached);
+      notifyListeners();
+    } else {
+      _isFetching = true;
+      notifyListeners();
+    }
 
-    await loadPopularMovies(count: 25);
+    // Fetch fresh batch in parallel (appends to end of current list)
+    await _loadPopularBatch(25);
+
+    // Save the fresh movies to cache for the next launch
+    StorageService.saveMovieCache(
+      _movies.length > 25 ? _movies.sublist(_movies.length - 25) : List.of(_movies),
+    ).ignore();
 
     _isFetching = false;
     notifyListeners();
   }
 
-  Future<void> loadPopularMovies({required int count}) async {
-    final List<Movie> newMovies = [];
+  // Fetches `count` NEW movies in parallel and appends them to _movies.
+  Future<void> _loadPopularBatch(int count) async {
+    // Two random pages in parallel → ~40 candidate IDs
+    final p1 = _generateUniquePage();
+    final p2 = _generateUniquePage();
+    final pageResults = await Future.wait([
+      _movieService.fetchPopularMovieIds(p1),
+      _movieService.fetchPopularMovieIds(p2),
+    ]);
 
-    while (_movies.length + newMovies.length < count) {
-      int page = _generateUniquePage();
-      final ids = await _movieService.fetchPopularMovieIds(page);
+    final seenIds = _movies.map((m) => m.id).toSet();
+    final candidateIds = pageResults
+        .expand((ids) => ids)
+        .toSet()
+        .where((id) => !seenIds.contains(id))
+        .take(count)
+        .toList();
 
-      for (final id in ids) {
-        final movie = await _movieService.fetchMovieDetails(id);
-        if (movie != null &&
-            !_movies.any((m) => m.id == movie.id) &&
-            !newMovies.any((m) => m.id == movie.id)) {
-          newMovies.add(movie);
-        }
+    // All detail requests fire simultaneously
+    final results = await Future.wait(
+      candidateIds.map(_movieService.fetchMovieDetails),
+    );
+    final newMovies = results.whereType<Movie>().where((m) => m.rating >= 4.0).toList();
 
-        if (_movies.length + newMovies.length >= count) break;
-      }
-    }
-
+    _precacheImages(newMovies);
     _movies.addAll(newMovies);
+  }
+
+  Future<void> loadPopularMovies({required int count}) async {
+    await _loadPopularBatch(count - _movies.length);
     notifyListeners();
   }
 
   Future<void> loadMorePopular() async {
-    await loadPopularMovies(count: _movies.length + 15);
+    await _loadPopularBatch(15);
     notifyListeners();
   }
 
@@ -73,10 +100,13 @@ class MoviesProvider with ChangeNotifier {
     required int count,
     required bool isInitial,
   }) async {
+    if (_isFetching) return;
+
     if (isInitial) {
       _movies.clear();
       _filteredPage = 0;
       _isFetching = true;
+      _filtersApplied = true;
       notifyListeners();
     }
 
@@ -88,10 +118,11 @@ class MoviesProvider with ChangeNotifier {
       try {
         final movies = await _movieService.fetchFilteredMovies(
           genreIds: _selectedGenreIds,
+          countryCodes: _selectedCountryCodes,
           minRating: _minRating,
           maxRating: _maxRating,
-          minYear: _minDecade,
-          maxYear: _maxDecade,
+          minYear: _minYear,
+          maxYear: _maxYear,
           page: _filteredPage,
         );
 
@@ -106,13 +137,12 @@ class MoviesProvider with ChangeNotifier {
 
         if (movies.isEmpty) break;
       } catch (e) {
-        print(
-          'Failed to load filtered movies on page $_filteredPage: $e',
-        );
+        debugPrint('loadFilteredMovies page $_filteredPage: $e');
         break;
       }
     }
 
+    _precacheImages(newMovies);
     _movies.addAll(newMovies);
 
     if (isInitial) {
@@ -123,11 +153,10 @@ class MoviesProvider with ChangeNotifier {
   }
 
   Future<void> loadMoreFiltered() async {
-    await loadFilteredMovies(
-      count: _movies.length + 15,
-      isInitial: false,
-    );
-    notifyListeners();
+    if (_isLoadingMore) return;
+    _isLoadingMore = true;
+    await loadFilteredMovies(count: _movies.length + 15, isInitial: false);
+    _isLoadingMore = false;
   }
 
   void loadFromHive(List<Movie> movies) {
@@ -163,6 +192,14 @@ class MoviesProvider with ChangeNotifier {
     return page;
   }
 
+  void _precacheImages(List<Movie> movies) {
+    final cache = DefaultCacheManager();
+    for (final movie in movies) {
+      cache.downloadFile(movie.posterUrl).ignore();
+      cache.downloadFile(movie.backdropUrl).ignore();
+    }
+  }
+
   void setAccentColor(Color color) {
     _accentColor = color;
     notifyListeners();
@@ -177,26 +214,35 @@ class MoviesProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleCountry(String code) {
+    if (_selectedCountryCodes.contains(code)) {
+      _selectedCountryCodes.remove(code);
+    } else {
+      _selectedCountryCodes.add(code);
+    }
+    notifyListeners();
+  }
+
   void updateRatingRange(double min, double max) {
     _minRating = min;
     _maxRating = max;
     notifyListeners();
   }
 
-  void updateDecadeRange(int min, int max) {
-    _minDecade = min;
-    _maxDecade = max;
+  void updateYearRange(int min, int max) {
+    _minYear = min;
+    _maxYear = max;
     notifyListeners();
   }
 
   void resetFilters() {
     _selectedGenreIds.clear();
-    _minRating = 0.0;
+    _selectedCountryCodes.clear();
+    _minRating = 4.0;
     _maxRating = 10.0;
-    _minDecade = 1920;
-    _maxDecade = 2020;
+    _minYear = 1975;
+    _maxYear = 2024;
     _filtersApplied = false;
-    loadInitialMovies();
-    notifyListeners();
+    loadInitialMovies(); // calls notifyListeners() internally
   }
 }

@@ -1,0 +1,9 @@
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit"
+  },
+  "dart.openDevTools": "flutterStatusLine",
+  "dart.debugExternalPackageLibraries": false,
+  "dart.debugSdkLibraries": false
+}

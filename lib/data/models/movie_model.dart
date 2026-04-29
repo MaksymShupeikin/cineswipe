@@ -1,4 +1,4 @@
-import 'package:cineswap/core/app_exports.dart';
+import 'package:cineswipe/core/app_exports.dart';
 
 part 'movie_model.g.dart';
 

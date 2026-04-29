@@ -1,5 +1,5 @@
-import 'package:cineswap/core/app_exports.dart';
-import 'package:cineswap/presentation/widgets/favorite_movie_card.dart';
+import 'package:cineswipe/core/app_exports.dart';
+import 'package:cineswipe/presentation/widgets/favorite_movie_card.dart';
 
 class FavoritesScreen extends StatefulWidget {
   final Size size;
@@ -44,30 +44,20 @@ class _FavoritesScreenState extends State<FavoritesScreen>
               children: [
                 Expanded(
                   child: ListView.builder(
-                    key: PageStorageKey('favoritesList'),
+                    key: const PageStorageKey('favoritesList'),
                     itemCount: favorites.length,
+                    padding: EdgeInsets.only(
+                      top: MediaQuery.of(context).padding.top + 10,
+                      bottom: size.height * 0.15,
+                    ),
                     addAutomaticKeepAlives: true,
                     itemBuilder: (context, index) {
                       final movie = favorites[index];
 
-                      return Padding(
-                        padding:
-                            index == 0
-                                ? EdgeInsets.only(
-                                  top: size.height * 0.02,
-                                )
-                                : index == favorites.length - 1
-                                ? EdgeInsets.only(
-                                  bottom: size.height * 0.15,
-                                )
-                                : EdgeInsets.zero,
-                        child: FavoriteMovieCard(
-                          movie: movie,
-                          size: size,
-                          onDelete:
-                              () =>
-                                  provider.removeFromFavorites(movie),
-                        ),
+                      return FavoriteMovieCard(
+                        movie: movie,
+                        size: size,
+                        onDelete: () => provider.removeFromFavorites(movie),
                       );
                     },
                   ),

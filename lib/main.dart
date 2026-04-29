@@ -1,4 +1,4 @@
-import 'package:cineswap/core/app_exports.dart';
+import 'package:cineswipe/core/app_exports.dart';
 
 void main() async {
   await initializeApp();
@@ -23,7 +23,16 @@ class Cineswipe extends StatelessWidget {
     return MaterialApp(
       title: 'CineSwipe',
       debugShowCheckedModeBanner: false,
-      home: NavigationScreen(size: size),
+      home: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.black,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+        child: NavigationScreen(size: size),
+      ),
     );
   }
 }

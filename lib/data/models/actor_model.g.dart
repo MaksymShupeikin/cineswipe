@@ -8,7 +8,7 @@ part of 'actor_model.dart';
 
 class ActorAdapter extends TypeAdapter<Actor> {
   @override
-  final int typeId = 1;
+  final typeId = 1;
 
   @override
   Actor read(BinaryReader reader) {
@@ -16,10 +16,7 @@ class ActorAdapter extends TypeAdapter<Actor> {
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return Actor(
-      name: fields[0] as String,
-      profileUrl: fields[1] as String,
-    );
+    return Actor(name: fields[0] as String, profileUrl: fields[1] as String);
   }
 
   @override

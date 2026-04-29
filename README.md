@@ -1,4 +1,4 @@
-# cineswap
+# CineSwipe
 
 A new Flutter project.
 

@@ -1,4 +1,4 @@
-package com.example.cineswap
+package com.example.cineswipe
 
 import io.flutter.embedding.android.FlutterActivity
 

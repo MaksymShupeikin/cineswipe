@@ -1,85 +1,96 @@
-import 'package:cineswap/core/app_exports.dart';
+import 'package:cineswipe/core/app_exports.dart';
 
 class BlackContainer extends StatelessWidget {
   final Size size;
   final String? screenTitle;
+  final double swipeProgress; // -1..0..1
 
   const BlackContainer({
     super.key,
     required this.size,
     this.screenTitle,
+    this.swipeProgress = 0.0,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.black.withAlpha(240),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.white.withAlpha(127),
-            blurRadius: 10,
-            spreadRadius: 2,
-          ),
-        ],
+    final skipActivation = (-swipeProgress).clamp(0.0, 1.0);
+    final likeActivation = swipeProgress.clamp(0.0, 1.0);
+
+    final skipColor = Color.lerp(
+      AppColors.white.withValues(alpha: 1.0 - likeActivation * 0.65),
+      const Color(0xFFFF6B6B),
+      skipActivation,
+    )!;
+
+    final likeColor = Color.lerp(
+      AppColors.white.withValues(alpha: 1.0 - skipActivation * 0.65),
+      const Color(0xFF5EE89A),
+      likeActivation,
+    )!;
+
+    final skipScale = 1.0 + skipActivation * 0.35;
+    final likeScale = 1.0 + likeActivation * 0.35;
+    final dividerAlpha = (0.2 - swipeProgress.abs() * 0.2).clamp(0.0, 0.2);
+
+    return LiquidGlass.withOwnLayer(
+      settings: const LiquidGlassSettings(
+        thickness: 14,
+        blur: 20,
+        glassColor: Color(0x55000000),
       ),
-      child: Padding(
+      shape: LiquidRoundedSuperellipse(borderRadius: 20),
+      child: Container(
         padding: EdgeInsets.symmetric(
           vertical:
-              screenTitle == null
-                  ? size.height * 0.01
-                  : size.height * 0.02,
+              screenTitle == null ? size.height * 0.006 : size.height * 0.015,
           horizontal: size.width * 0.02,
         ),
-        child:
-            screenTitle == null
-                ? Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: screenTitle == null
+            ? IntrinsicWidth(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.arrow_back,
-                            color: AppColors.white,
-                          ),
-                          SizedBox(height: size.height * 0.003),
-                          'Skip'.regular(),
-                        ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Transform.scale(
+                        scale: skipScale,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.arrow_back, color: skipColor, size: 20),
+                            SizedBox(height: size.height * 0.002),
+                            'Skip'.regular(color: skipColor),
+                          ],
+                        ),
                       ),
                     ),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.arrow_upward,
-                            color: AppColors.white,
-                          ),
-                          SizedBox(height: size.height * 0.003),
-                          'Seen'.regular(),
-                        ],
-                      ),
+                    Container(
+                      width: 1,
+                      height: 24,
+                      color: AppColors.white.withValues(alpha: dividerAlpha),
                     ),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.arrow_forward,
-                            color: AppColors.white,
-                          ),
-                          SizedBox(height: size.height * 0.003),
-                          'Like'.regular(),
-                        ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Transform.scale(
+                        scale: likeScale,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.arrow_forward,
+                                color: likeColor, size: 20),
+                            SizedBox(height: size.height * 0.002),
+                            'Like'.regular(color: likeColor),
+                          ],
+                        ),
                       ),
                     ),
                   ],
-                )
-                : screenTitle!.bold(fontSize: 22),
+                ),
+              )
+            : screenTitle!.bold(fontSize: 22),
       ),
     );
   }

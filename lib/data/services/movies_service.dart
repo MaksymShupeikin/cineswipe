@@ -1,4 +1,4 @@
-import 'package:cineswap/core/app_exports.dart';
+import 'package:cineswipe/core/app_exports.dart';
 import 'package:http/http.dart' as http;
 
 class MovieService {
@@ -16,6 +16,7 @@ class MovieService {
 
   Future<List<Movie>> fetchFilteredMovies({
     required List<int> genreIds,
+    required List<String> countryCodes,
     required double minRating,
     required double maxRating,
     required int minYear,
@@ -29,9 +30,11 @@ class MovieService {
       'page': '$page',
       'vote_average.gte': '$minRating',
       'vote_average.lte': '$maxRating',
+      'vote_count.gte': '50',
       'primary_release_date.gte': '$minYear-01-01',
       'primary_release_date.lte': '$maxYear-12-31',
-      if (genreIds.isNotEmpty) 'with_genres': genreIds.join(','),
+      if (genreIds.isNotEmpty) 'with_genres': genreIds.join('|'),
+      if (countryCodes.isNotEmpty) 'with_origin_country': countryCodes.join('|'),
       'language': 'en-US',
       'api_key': apiKey,
     };
@@ -53,14 +56,8 @@ class MovieService {
 
     final ids = results.map((e) => e['id'] as int).toList();
 
-    final movies = <Movie>[];
-
-    for (final id in ids) {
-      final movie = await fetchMovieDetails(id);
-      if (movie != null) movies.add(movie);
-    }
-
-    return movies;
+    final fetched = await Future.wait(ids.map(fetchMovieDetails));
+    return fetched.whereType<Movie>().toList();
   }
 
   Future<Movie?> fetchMovieDetails(int id) async {

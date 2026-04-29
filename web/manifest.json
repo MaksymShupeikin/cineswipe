@@ -1,6 +1,6 @@
 {
-    "name": "cineswap",
-    "short_name": "cineswap",
+    "name": "cineswipe",
+    "short_name": "cineswipe",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -8,7 +8,7 @@ part of 'movie_model.dart';
 
 class MovieAdapter extends TypeAdapter<Movie> {
   @override
-  final int typeId = 0;
+  final typeId = 0;
 
   @override
   Movie read(BinaryReader reader) {
@@ -17,11 +17,11 @@ class MovieAdapter extends TypeAdapter<Movie> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return Movie(
-      id: fields[0] as int,
+      id: (fields[0] as num).toInt(),
       title: fields[1] as String,
-      year: fields[2] as int,
+      year: (fields[2] as num).toInt(),
       genres: (fields[3] as List).cast<String>(),
-      rating: fields[4] as double,
+      rating: (fields[4] as num).toDouble(),
       country: fields[5] as String,
       runtime: fields[6] as String,
       duration: fields[7] as String,

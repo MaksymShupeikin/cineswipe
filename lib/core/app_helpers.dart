@@ -1,16 +1,18 @@
 class AppHelpers {
-  static String getYouTubeThumbnail(String videoUrl) {
+  static String? extractVideoId(String videoUrl) {
     final uri = Uri.tryParse(videoUrl);
+    if (uri == null) return null;
 
-    String? videoId;
-    if (uri != null) {
-      if (uri.host.contains('youtube.com')) {
-        videoId = uri.queryParameters['v'];
-      } else if (uri.host.contains('youtu.be')) {
-        videoId = uri.pathSegments.first;
-      }
+    if (uri.host.contains('youtube.com')) {
+      return uri.queryParameters['v'];
+    } else if (uri.host.contains('youtu.be')) {
+      return uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
     }
+    return null;
+  }
 
+  static String getYouTubeThumbnail(String videoUrl) {
+    final videoId = extractVideoId(videoUrl);
     if (videoId == null || videoId.isEmpty) return '';
 
     return 'https://img.youtube.com/vi/$videoId/hqdefault.jpg';
