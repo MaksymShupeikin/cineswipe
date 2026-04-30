@@ -88,15 +88,17 @@ class _NavigationScreenState extends State<NavigationScreen> {
             left: 0,
             right: 0,
             height: size.height * 0.18,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppColors.black.withValues(alpha: 0.0),
-                    AppColors.black.withValues(alpha: 0.8),
-                  ],
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.black.withValues(alpha: 0.0),
+                      AppColors.black.withValues(alpha: 0.8),
+                    ],
+                  ),
                 ),
               ),
             ),

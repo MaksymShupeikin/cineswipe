@@ -35,11 +35,12 @@ class _FavoritesScreenState extends State<FavoritesScreen>
         final List<Movie> favorites = provider.favorites;
 
         return favorites.isEmpty
-            ? Center(
-              child:
-                  'Swipe the movie to the right and it will appear here'
-                      .bold(fontSize: 22),
-            )
+            ? GlassPlaceholder(
+                size: size,
+                icon: Icons.swipe_right_outlined,
+                title: 'No favorites yet',
+                subtitle: 'Swipe movies to the right to save them to your collection.',
+              )
             : Column(
               children: [
                 Expanded(

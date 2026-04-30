@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:cineswipe/core/app_exports.dart';
 
 class FiltersScreen extends StatelessWidget {
@@ -290,6 +289,7 @@ class FiltersScreen extends StatelessWidget {
         Expanded(
           flex: 2,
           child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () {
               HapticService.heavy();
               onFiltersApplied();
@@ -313,6 +313,7 @@ class FiltersScreen extends StatelessWidget {
         Expanded(
           flex: 1,
           child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () {
               HapticService.medium();
               onFiltersReset();

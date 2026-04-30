@@ -41,3 +41,4 @@ export 'package:cineswipe/presentation/widgets/liquid_background.dart';
 export 'dart:ui' show ImageFilter;
 export 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 export 'package:cineswipe/presentation/widgets/trailer_player_modal.dart';
+export 'package:cineswipe/presentation/widgets/glass_placeholder.dart';

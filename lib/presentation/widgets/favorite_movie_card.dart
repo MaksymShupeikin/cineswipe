@@ -1,5 +1,4 @@
 import 'package:cineswipe/core/app_exports.dart';
-import 'package:flutter/cupertino.dart';
 
 class FavoriteMovieCard extends StatefulWidget {
   final Movie movie;

@@ -16,6 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ValueNotifier<double> _swipeX = ValueNotifier(0.0);
 
   double _dragStartX = 0.0;
+  bool _hapticTriggered = false;
 
   @override
   void initState() {
@@ -39,7 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
     String imageUrl,
     BuildContext context,
   ) async {
-    final color = await ColorFromImageService.getAverageColorFromNetworkImage(imageUrl);
+    final color = await ColorFromImageService.getAverageColorFromNetworkImage(
+      imageUrl,
+    );
     if (!context.mounted) return;
     Provider.of<MoviesProvider>(context, listen: false).setAccentColor(color);
   }
@@ -59,83 +62,118 @@ class _HomeScreenState extends State<HomeScreen> {
                 behavior: HitTestBehavior.translucent,
                 onPointerDown: (e) {
                   _dragStartX = e.position.dx;
+                  _hapticTriggered = false;
                 },
                 onPointerMove: (e) {
                   final offset = e.position.dx - _dragStartX;
-                  final progress =
-                      (offset / (widget.size.width * 0.4)).clamp(-1.0, 1.0);
+                  final progress = (offset / (widget.size.width * 0.4)).clamp(
+                    -1.0,
+                    1.0,
+                  );
+
                   if (_swipeX.value != progress) _swipeX.value = progress;
+
+                  // Early haptic feedback based on progress threshold
+                  if (progress.abs() > 0.7 && !_hapticTriggered) {
+                    if (progress > 0) {
+                      HapticService.heavy();
+                    } else {
+                      HapticService.medium();
+                    }
+                    _hapticTriggered = true;
+                  } else if (progress.abs() < 0.4) {
+                    // Allow re-triggering if user drags back towards center
+                    _hapticTriggered = false;
+                  }
                 },
-                onPointerUp: (_) => _swipeX.value = 0.0,
-                onPointerCancel: (_) => _swipeX.value = 0.0,
-                child: isFetching
-                    ? CardSwiper(
-                        numberOfCardsDisplayed: 2,
-                        allowedSwipeDirection:
-                            const AllowedSwipeDirection.only(
-                          left: true,
-                          right: true,
-                        ),
-                        backCardOffset:
-                            Offset(0, widget.size.height * 0.05),
-                        cardsCount: 2,
-                        padding: EdgeInsets.zero,
-                        isDisabled: true,
-                        cardBuilder: (context, index, _, __) =>
-                            MovieCardShimmer(size: widget.size),
-                        isLoop: true,
-                      )
-                    : CardSwiper(
-                        numberOfCardsDisplayed: 2,
-                        allowedSwipeDirection:
-                            const AllowedSwipeDirection.only(
-                          left: true,
-                          right: true,
-                        ),
-                        backCardOffset:
-                            Offset(0, widget.size.height * 0.05),
-                        cardsCount: max(2, movies.length),
-                        padding: EdgeInsets.zero,
-                        isDisabled: false,
-                        onSwipe: (previousIndex, currentIndex, direction) {
-                          swipeCount++;
-
-                          if (swipeCount % 15 == 0) {
-                            provider.filtersApplied
-                                ? provider.loadMoreFiltered()
-                                : provider.loadMorePopular();
-                          }
-
-                          if (movies.isNotEmpty &&
-                              previousIndex < movies.length) {
-                            switch (direction) {
-                              case CardSwiperDirection.left:
-                                HapticService.medium();
-                                _updateAccentColorFromPoster(
-                                  movies[currentIndex!].posterUrl,
-                                  context,
-                                );
-                                break;
-                              case CardSwiperDirection.right:
-                                HapticService.heavy();
-                                _updateAccentColorFromPoster(
-                                  movies[currentIndex!].posterUrl,
-                                  context,
-                                );
-                                provider.addToFavorites(movies[previousIndex]);
-                                break;
-                              default:
-                                break;
-                            }
-                          }
-                          return true;
-                        },
-                        cardBuilder: (context, index, _, __) => MovieCard(
+                onPointerUp: (_) {
+                  _swipeX.value = 0.0;
+                  _hapticTriggered = false;
+                },
+                onPointerCancel: (_) {
+                  _swipeX.value = 0.0;
+                  _hapticTriggered = false;
+                },
+                child:
+                    isFetching
+                        ? CardSwiper(
+                          numberOfCardsDisplayed: 2,
+                          allowedSwipeDirection:
+                              const AllowedSwipeDirection.only(
+                                left: true,
+                                right: true,
+                              ),
+                          backCardOffset: Offset(0, widget.size.height * 0.05),
+                          cardsCount: 2,
+                          padding: EdgeInsets.zero,
+                          isDisabled: true,
+                          cardBuilder:
+                              (context, index, _, __) =>
+                                  MovieCardShimmer(size: widget.size),
+                          isLoop: true,
+                        )
+                        : movies.isEmpty
+                        ? GlassPlaceholder(
                           size: widget.size,
-                          movie: movies[index],
+                          icon: Icons.movie_filter_outlined,
+                          title: 'No movies found',
+                          subtitle:
+                              'Try adjusting your filters to find more great movies to watch.',
+                          actionLabel: 'Reset Filters',
+                          onAction: () => provider.resetFilters(),
+                        )
+                        : CardSwiper(
+                          numberOfCardsDisplayed: 2,
+                          allowedSwipeDirection:
+                              const AllowedSwipeDirection.only(
+                                left: true,
+                                right: true,
+                              ),
+                          backCardOffset: Offset(0, widget.size.height * 0.05),
+                          cardsCount: max(2, movies.length),
+                          padding: EdgeInsets.zero,
+                          isDisabled: false,
+                          onSwipe: (previousIndex, currentIndex, direction) {
+                            swipeCount++;
+                            _hapticTriggered = false;
+
+                            if (swipeCount % 15 == 0) {
+                              provider.filtersApplied
+                                  ? provider.loadMoreFiltered()
+                                  : provider.loadMorePopular();
+                            }
+
+                            if (movies.isNotEmpty &&
+                                previousIndex < movies.length) {
+                              switch (direction) {
+                                case CardSwiperDirection.left:
+                                  _updateAccentColorFromPoster(
+                                    movies[currentIndex!].posterUrl,
+                                    context,
+                                  );
+                                  break;
+                                case CardSwiperDirection.right:
+                                  _updateAccentColorFromPoster(
+                                    movies[currentIndex!].posterUrl,
+                                    context,
+                                  );
+                                  provider.addToFavorites(
+                                    movies[previousIndex],
+                                  );
+                                  break;
+                                default:
+                                  break;
+                              }
+                            }
+                            return true;
+                          },
+                          cardBuilder:
+                              (context, index, _, __) => MovieCard(
+                                size: widget.size,
+                                movie: movies[index],
+                              ),
+                          isLoop: true,
                         ),
-                        isLoop: true,
-                      ),
               ),
             ),
 
@@ -150,12 +188,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (context, swipeX, _) {
                       return TweenAnimationBuilder<double>(
                         tween: Tween<double>(begin: 0.0, end: swipeX),
-                        duration: swipeX == 0.0
-                            ? const Duration(milliseconds: 450)
-                            : const Duration(milliseconds: 60),
-                        curve: swipeX == 0.0
-                            ? Curves.elasticOut
-                            : Curves.linear,
+                        duration:
+                            swipeX == 0.0
+                                ? const Duration(milliseconds: 450)
+                                : const Duration(milliseconds: 60),
+                        curve:
+                            swipeX == 0.0 ? Curves.elasticOut : Curves.linear,
                         builder: (context, animX, _) {
                           return Transform.rotate(
                             angle: animX * 0.18,
