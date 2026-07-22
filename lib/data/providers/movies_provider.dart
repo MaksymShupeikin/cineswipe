@@ -4,7 +4,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 class MoviesProvider with ChangeNotifier {
   final MovieService _movieService = MovieService();
   final StorageService _storageService = StorageService();
-  List<Movie> _movies = [];
+  final List<Movie> _movies = [];
   final List<Movie> _favorites = [];
   final List<int> _selectedGenreIds = [];
   final List<String> _selectedCountryCodes = [];
@@ -51,7 +51,9 @@ class MoviesProvider with ChangeNotifier {
 
     // Save the fresh movies to cache for the next launch
     StorageService.saveMovieCache(
-      _movies.length > 25 ? _movies.sublist(_movies.length - 25) : List.of(_movies),
+      _movies.length > 25
+          ? _movies.sublist(_movies.length - 25)
+          : List.of(_movies),
     ).ignore();
 
     _isFetching = false;
@@ -69,18 +71,20 @@ class MoviesProvider with ChangeNotifier {
     ]);
 
     final seenIds = _movies.map((m) => m.id).toSet();
-    final candidateIds = pageResults
-        .expand((ids) => ids)
-        .toSet()
-        .where((id) => !seenIds.contains(id))
-        .take(count)
-        .toList();
+    final candidateIds =
+        pageResults
+            .expand((ids) => ids)
+            .toSet()
+            .where((id) => !seenIds.contains(id))
+            .take(count)
+            .toList();
 
     // All detail requests fire simultaneously
     final results = await Future.wait(
       candidateIds.map(_movieService.fetchMovieDetails),
     );
-    final newMovies = results.whereType<Movie>().where((m) => m.rating >= 4.0).toList();
+    final newMovies =
+        results.whereType<Movie>().where((m) => m.rating >= 4.0).toList();
 
     _precacheImages(newMovies);
     _movies.addAll(newMovies);

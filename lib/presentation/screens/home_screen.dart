@@ -16,17 +16,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final ValueNotifier<double> _swipeX = ValueNotifier(0.0);
 
   double _dragStartX = 0.0;
+  double _pendingSwipeX = 0.0;
   bool _hapticTriggered = false;
+  bool _swipeFrameScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final provider = Provider.of<MoviesProvider>(context, listen: false);
-      await provider.loadInitialMovies();
-      if (provider.movies.isNotEmpty && mounted) {
-        _updateAccentColorFromPoster(provider.movies.first.posterUrl, context);
-      }
+      _loadInitialMovies(provider);
     });
   }
 
@@ -36,23 +36,59 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _updateAccentColorFromPoster(
-    String imageUrl,
-    BuildContext context,
-  ) async {
+  Future<void> _updateAccentColorFromPoster(String imageUrl) async {
     final color = await ColorFromImageService.getAverageColorFromNetworkImage(
       imageUrl,
     );
-    if (!context.mounted) return;
+    if (!mounted) return;
     Provider.of<MoviesProvider>(context, listen: false).setAccentColor(color);
+  }
+
+  Future<void> _loadInitialMovies(MoviesProvider provider) async {
+    await provider.loadInitialMovies();
+    if (!mounted || provider.movies.isEmpty) return;
+    _updateAccentColorFromPoster(provider.movies.first.posterUrl);
+  }
+
+  void _setSwipeProgress(double progress, {bool immediate = false}) {
+    _pendingSwipeX = progress;
+
+    if (immediate) {
+      if (_swipeX.value != progress) _swipeX.value = progress;
+      return;
+    }
+
+    if (_swipeFrameScheduled) return;
+    _swipeFrameScheduled = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _swipeFrameScheduled = false;
+      if (!mounted) return;
+
+      final nextProgress = _pendingSwipeX;
+      if (nextProgress == 0.0 ||
+          (_swipeX.value - nextProgress).abs() >= 0.005) {
+        _swipeX.value = nextProgress;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<MoviesProvider>(
-      builder: (context, provider, child) {
+    return Selector<
+      MoviesProvider,
+      ({bool filtersApplied, bool isFetching, int moviesLength})
+    >(
+      selector:
+          (_, provider) => (
+            filtersApplied: provider.filtersApplied,
+            isFetching: provider.isFetching,
+            moviesLength: provider.movies.length,
+          ),
+      builder: (context, state, child) {
+        final provider = context.read<MoviesProvider>();
         final movies = provider.movies;
-        final isFetching = provider.isFetching;
+        final isFetching = state.isFetching;
 
         return Stack(
           children: [
@@ -71,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     1.0,
                   );
 
-                  if (_swipeX.value != progress) _swipeX.value = progress;
+                  _setSwipeProgress(progress);
 
                   // Early haptic feedback based on progress threshold
                   if (progress.abs() > 0.7 && !_hapticTriggered) {
@@ -81,17 +117,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       HapticService.medium();
                     }
                     _hapticTriggered = true;
-                  } else if (progress.abs() < 0.4) {
-                    // Allow re-triggering if user drags back towards center
-                    _hapticTriggered = false;
                   }
                 },
                 onPointerUp: (_) {
-                  _swipeX.value = 0.0;
+                  _setSwipeProgress(0.0, immediate: true);
                   _hapticTriggered = false;
                 },
                 onPointerCancel: (_) {
-                  _swipeX.value = 0.0;
+                  _setSwipeProgress(0.0, immediate: true);
                   _hapticTriggered = false;
                 },
                 child:
@@ -138,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             _hapticTriggered = false;
 
                             if (swipeCount % 15 == 0) {
-                              provider.filtersApplied
+                              state.filtersApplied
                                   ? provider.loadMoreFiltered()
                                   : provider.loadMorePopular();
                             }
@@ -149,13 +182,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 case CardSwiperDirection.left:
                                   _updateAccentColorFromPoster(
                                     movies[currentIndex!].posterUrl,
-                                    context,
                                   );
                                   break;
                                 case CardSwiperDirection.right:
                                   _updateAccentColorFromPoster(
                                     movies[currentIndex!].posterUrl,
-                                    context,
                                   );
                                   provider.addToFavorites(
                                     movies[previousIndex],

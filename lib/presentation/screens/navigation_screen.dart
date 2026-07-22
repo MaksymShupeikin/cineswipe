@@ -24,8 +24,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
         onFiltersApplied: () {
           setState(() => _selectedIndex = 1);
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Provider.of<MoviesProvider>(context, listen: false)
-                .loadFilteredMovies(count: 25, isInitial: true);
+            Provider.of<MoviesProvider>(
+              context,
+              listen: false,
+            ).loadFilteredMovies(count: 25, isInitial: true);
           });
         },
         onFiltersReset: () {
@@ -49,7 +51,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentAccentColor = context.watch<MoviesProvider>().accentColor;
+    final currentAccentColor = context.select<MoviesProvider, Color>(
+      (provider) => provider.accentColor,
+    );
 
     final Size size = widget.size;
 
@@ -59,7 +63,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
         children: [
           // Animated liquid background — full screen
           Positioned.fill(
-            child: LiquidBackground(accentColor: currentAccentColor),
+            child: RepaintBoundary(
+              child: LiquidBackground(accentColor: currentAccentColor),
+            ),
           ),
 
           // Page content with safe area, padded below to clear the tab bar
@@ -69,15 +75,15 @@ class _NavigationScreenState extends State<NavigationScreen> {
               bottom: false,
               child: Padding(
                 padding: EdgeInsets.only(
-                  top: (_selectedIndex == 2 || _selectedIndex == 0) ? 0 : size.height * 0.02,
+                  top:
+                      (_selectedIndex == 2 || _selectedIndex == 0)
+                          ? 0
+                          : size.height * 0.02,
                   left: size.width * 0.06,
                   right: size.width * 0.06,
                   bottom: 0,
                 ),
-                child: IndexedStack(
-                  index: _selectedIndex,
-                  children: _pages,
-                ),
+                child: IndexedStack(index: _selectedIndex, children: _pages),
               ),
             ),
           ),
@@ -123,15 +129,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 ),
                 CNTabBarItem(
                   label: 'Home',
-                  icon: CNSymbol(
-                    _selectedIndex == 1 ? 'house.fill' : 'house',
-                  ),
+                  icon: CNSymbol(_selectedIndex == 1 ? 'house.fill' : 'house'),
                 ),
                 CNTabBarItem(
                   label: 'Liked',
-                  icon: CNSymbol(
-                    _selectedIndex == 2 ? 'heart.fill' : 'heart',
-                  ),
+                  icon: CNSymbol(_selectedIndex == 2 ? 'heart.fill' : 'heart'),
                 ),
               ],
               currentIndex: _selectedIndex,
@@ -143,4 +145,3 @@ class _NavigationScreenState extends State<NavigationScreen> {
     );
   }
 }
-
